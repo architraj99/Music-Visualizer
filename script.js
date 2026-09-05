@@ -255,23 +255,41 @@ function getAverageEnergy() {
 }
 
 function updateBars() {
-    if(!analyser || !dataArray) {
+    if(!analyser || !dataArray || !bars.length) {
         return;
     }
     analyser.getByteFrequencyData(dataArray);
-    var frequencyIndex = 0;
 
-    for(var row = 0; row < bars.length; row += 1) {
+    var energy = getAverageEnergy();
+    var bass = getBassEnergy();
+    var rowCount = bars.length;
+    var time = performance.now() * 0.004;
 
-        for(var column = 0; column < bars[row].length; column += 1) {
-            var value = dataArray[frequencyIndex] || 0;
-            var scale = value / 10;
-            bars[row][column].scale.y = scale < 1 ? 1 : scale;
-            frequencyIndex += frequencyIndex < dataArray.length - 1 ? 1 : 0;
+    for(var row = 0; row < rowCount; row += 1) {
+        var rowProgress = rowCount > 1 ? row / (rowCount - 1) : 0;
+        var centerIndex = Math.floor(rowProgress * (dataArray.length - 1));
+        var columnCount = bars[row].length;
+
+        for(var column = 0; column < columnCount; column += 1) {
+
+            var columnProgress = columnCount > 1 ? column / (columnCount - 1) : 0;
+            var offset = Math.round((columnProgress - 0.5) * 12);
+            var frequencyIndex = clamp(centerIndex + offset, 0, dataArray.length - 1);
+
+            var value = getFrequencyValue(frequencyIndex);
+            var leftValue = getFrequencyValue(frequencyIndex - 1);
+            var rightValue = getFrequencyValue(frequencyIndex + 1);
+            var mixedValue = value * 0.6 + leftValue * 0.2 + rightValue * 0.2;
+
+            var frequencyEnergy = mixedValue / 255;
+            var pulse = Math.sin(time + row * 0.16 + column * 0.38) * 0.5 + 0.5;
+            var targetScale = 1 + frequencyEnergy * 17 + bass * 2.5 + energy * (1 + pulse * 2.2);
+            var bar = bars[row][column];
+            bar.scale.y += (targetScale - bar.scale.y) * 0.28;
         }
     }
 
-    tintSceneFromEnergy(getAverageEnergy());
+    tintSceneFromEnergy(energy);
 }
 
 function animate() {
